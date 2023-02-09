@@ -1,12 +1,70 @@
 import time
-from tkinter import *
 import threading
+import cv2
+from tkinter import *
+from deepface import DeepFace
 
 #separate task using threads; for tracking heart rate, emotions, and breathing
 def background_task():
+    #import classifier
+    faceCascade = cv2.CascadeClassifier('assets/classifiers/haarcascade_frontalface_default.xml')
+    font = cv2.FONT_HERSHEY_SIMPLEX #default font
+    
+    #initiate video capture
+    cap = cv2.VideoCapture(0)
+    cap.set(4,640) #set height
+    cap.set(3,480) #set width
+
+    #check if camera is accessible
+    if not cap.isOpened():
+        print("Camera inaccessible, trying again...")
+        
     while True:
+        #capture each frame
+        ret, frame = cap.read()
+        #set ret to true if frame is read correctly
+        if not ret:
+            print("Missing frames, ending capture...")
+            break
+        
+        #operations on the frame
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) #set frame colour to grey
+        duality = cv2.convertScaleAbs(frame, alpha=1.5, beta=0)
+
+        #frame capture rate
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        cv2.putText(frame, str(fps), (3, 10), font, 0.3, (255, 255, 255))
+
+        #face detection parameters
+        face = faceCascade.detectMultiScale(
+            gray,
+            scaleFactor=1.3, #reducing image size
+            minNeighbors=6, #higher less false positives
+            minSize=(33, 33),
+            flags=cv2.CASCADE_SCALE_IMAGE
+        )
+        
+        for x, y, w, h in face: #show rectangle around faces
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 255, 255), 1)
+        
+        #emotion recognition using Deepface
+        try:
+            emotion = DeepFace.analyze(duality, actions=['emotion'], silent=True) #emotional analysis using
+            print(emotion[0]['dominant_emotion']) #display main emotion
+            cv2.putText(frame, str(emotion[0]['dominant_emotion']), (x + 5, y - 5), font, 0.6, (255, 255, 255), 1)
+        except:
+            print('No face detected.') #display error
+            
+        #show frames in a window
+        cv2.imshow('Janus Mask', frame)
+        
+    #release capture on closing
+    cap.release()
+    cv2.destroyAllWindows()
+
+    '''while True:
         print("background task running...")
-        time.sleep(1) #half for a second
+        time.sleep(1) #half for a second'''
 
 #point moves left to right repeatedly
 def move_point():
