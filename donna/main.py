@@ -56,7 +56,9 @@ def background_task():
             print('No face detected.') #display error
             
         #show frames in a window
-        cv2.imshow('Janus Mask', frame)
+        if frame is not None:
+            cv2.imshow('Janus Mask', frame)
+            cv2.waitKey(1)
         
     #release capture on closing
     cap.release()
