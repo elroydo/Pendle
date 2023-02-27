@@ -1,119 +1,197 @@
 import time
 import threading
-import cv2
-from tkinter import *
+import numpy as np
+import cv2 as cv
 from deepface import DeepFace
+from tkinter import *
 
-#separate task using threads; for tracking heart rate, emotions, and breathing
-def background_task():
-    #import classifier
-    faceCascade = cv2.CascadeClassifier('assets/classifiers/haarcascade_frontalface_default.xml')
-    font = cv2.FONT_HERSHEY_SIMPLEX #default font
-    
+def cardMonitor():
+    print('Monitoring...')
+
+    #load Haar face and eye cascades (face shapes)
+    faceCascade = cv.CascadeClassifier(cv.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
     #initiate video capture
-    cap = cv2.VideoCapture(0)
-    cap.set(4,640) #set height
-    cap.set(3,480) #set width
+    cap = cv.VideoCapture(0)
+    cap.set(cv.CAP_PROP_FRAME_WIDTH, 640) #set camera resolution - width
+    cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480) #set camera resolution - height
+    frameRate = cap.get(cv.CAP_PROP_FPS)  #frames per second
+
+    #face parameters
+    faceBox = 200
+    dominantEmotion = ''
+
+    #frame parameters
+    font = cv.FONT_HERSHEY_SIMPLEX #default font
+
+    #fourier jazz
+    minFrequency = 1.0
+    maxFrequency = 1.8
+    buffer = 100
+    index = 0
+    fourierAvg = np.zeros((buffer))
+
+    #initialise gaussian pyramid
+    ROIGauss = np.zeros((buffer, faceBox//8, faceBox//8, 3))
+
+    #bandpass filter for specific frequencies
+    frequencies = (1.0*frameRate) * np.arange(buffer) / (1.0*buffer)
+    filter = (frequencies >= minFrequency) & (frequencies <= maxFrequency)
+
+    #heart rate variables
+    bpmCalculationFrequency = 30
+    bpmindex = 0
+    bpmbuffer = 30
+    bpmBuffer = np.zeros((bpmbuffer))
 
     #check if camera is accessible
     if not cap.isOpened():
-        print("Camera inaccessible, trying again...")
+        print("Camera inaccessible...")
         
     while True:
         #capture each frame
-        ret, frame = cap.read()
+        check, frame = cap.read()
         #set ret to true if frame is read correctly
-        if not ret:
+        if not check:
             print("Missing frames, ending capture...")
             break
         
         #operations on the frame
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) #set frame colour to grey
-        duality = cv2.convertScaleAbs(frame, alpha=1.5, beta=0)
-
-        #frame capture rate
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        cv2.putText(frame, str(fps), (3, 10), font, 0.3, (255, 255, 255))
+        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY) #set frame colour to grey
+        duality = cv.convertScaleAbs(frame, alpha=1.5, beta=0)
 
         #face detection parameters
-        face = faceCascade.detectMultiScale(
-            gray,
-            scaleFactor=1.3, #reducing image size
-            minNeighbors=6, #higher less false positives
-            minSize=(33, 33),
-            flags=cv2.CASCADE_SCALE_IMAGE
-        )
-        
-        for x, y, w, h in face: #show rectangle around faces
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 255, 255), 1)
-        
-        #emotion recognition using Deepface
-        try:
-            emotion = DeepFace.analyze(duality, actions=['emotion'], silent=True) #emotional analysis using
-            print(emotion[0]['dominant_emotion']) #display main emotion
-            cv2.putText(frame, str(emotion[0]['dominant_emotion']), (x + 5, y - 5), font, 0.6, (255, 255, 255), 1)
-        except:
-            print('No face detected.') #display error
+        face = faceCascade.detectMultiScale(gray, 1.3, 5)
+
+        if len(face) > 0:
+            #left, top, right, bottom
+            (x, y, w, h) = face[0] #extract face coordinates
+
+            #Emotion recognition using Deepface
+            cv.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            if index % frameRate ==  0:
+                try:
+                    emotion = DeepFace.analyze(duality, actions=['emotion'], silent=True) #emotional analysis using
+                    dominantEmotion = emotion[0]['dominant_emotion']
+                    print(emotion[0]['dominant_emotion']) #display main emotion
+                except:
+                    print('No face detected.') #display error
+
+            #Heart rate and breathing
+            #fixed size box around face
+            xCenter = x + w // 2
+            yCenter = y + h // 2
+            halfFaceBox = faceBox // 2
+            x1 = max(xCenter - halfFaceBox, 0)
+            y1 = max(yCenter - halfFaceBox, 0)
+            x2 = min(xCenter + halfFaceBox, frame.shape[1])
+            y2 = min(yCenter + halfFaceBox, frame.shape[0])
+            cv.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 255), 2)
+
+            #extract roi from frame
+            faceROI = frame[y1:y2, x1:x2]
+            levels = faceROI.shape[2]
+
+            #apply gaussian pyramid function to ROI (scaled down image 3 levels)
+            downROI = faceROI  #temporary holder
+            pyramid = [downROI]
+            for _ in range(levels):
+                down = cv.pyrDown(downROI) #downscale frame 
+                downROI = down  #assign downscaled frame
+                pyramid.append(downROI)  #add to list
+
+            #add downscaled gauss frame to index in list
+            if len(pyramid[levels]) == len(ROIGauss[index]):
+                ROIGauss[index] = pyramid[levels]
+
+            #apply fast fourier tranform to downscaled gauss frame 
+            fourier = np.fft.fft(ROIGauss, axis=0)
+
+            #apply bandpass filter 
+            fourier[filter == False] = 0 #keep specific frequencies
+
+            #grab heart and respiration rates 
+            if index % bpmCalculationFrequency == 0: #sampling rate
+                for _ in range(buffer): #iterate through buffer
+                    fourierAvg[_] = np.real(fourier[_]).mean() #store real signal averages
+                bpm = 60.0 * frequencies[np.argmax(fourierAvg)] #multiply max values (hertz) by 60 (seconds)
+                bpmBuffer[bpmindex] = bpm #add estimate to buffer
+                bpmindex = (bpmindex + 1) % bpmbuffer #increment iterating index
+                print('BPM: %d' % bpmBuffer.mean())  #print heart rate
+                print(f'BRPM: {bpmBuffer.mean()//4}') #calculate and print respiration rate
+
+            index = (index + 1) % buffer #increment iterating index
             
+            #apply gaussian pyramid function to ROI (scaled up by 3 levels)
+            upROI = downROI #temporary holder
+            pyramid = [upROI]
+            for _ in range(levels):
+                up = cv.pyrUp(upROI) #upscale frame
+                upROI = up  #assign upscaled frame
+                pyramid.append(upROI)  #add to list
+            
+            if len(frame[y1:y2, x1:x2]) == len(pyramid[levels]):
+                frame[y1:y2, x1:x2] = pyramid[levels] * 17
+
+        cv.putText(frame, f'BPM: {bpmBuffer.mean()}', (10, 30), font, 0.6, (255, 255, 255), 1) #display bpm
+        cv.putText(frame, f'Emotion: {str(dominantEmotion)}', (10, 60), font, 0.6, (255, 255, 255), 1) #display emotion in frame
+
         #show frames in a window
         if frame is not None:
-            cv2.imshow('Janus Mask', frame)
-            cv2.waitKey(1)
-        
+            cv.imshow('Janus', frame)
+            cv.waitKey(1)
+            
     #release capture on closing
     cap.release()
-    cv2.destroyAllWindows()
+    cv.destroyAllWindows()
+    print("Terminating...")
 
-    '''while True:
-        print("background task running...")
-        time.sleep(1) #half for a second'''
-
+#Canvas jazz
 #point moves left to right repeatedly
-def move_point():
+def movePoint():
     global direction #access global variable
     if direction == 'right':
-        canvas_2.move(point, -10, 0) #move point 10 pixels to the left
-        if canvas_2.coords(point)[0] < 30:  #check coordinates
+        canvas2.move(point, -10, 0) #move point 10 pixels to the left
+        if canvas2.coords(point)[0] < 30:  #check coordinates
             direction = 'left' #set direction
     else:
-        canvas_2.move(point, 10, 0) #move point 10 pixels to the right
-        if canvas_2.coords(point)[2] > 770: #check coordinates
+        canvas2.move(point, 10, 0) #move point 10 pixels to the right
+        if canvas2.coords(point)[2] > 770: #check coordinates
             direction = 'right'
-    canvas_2.after(10, move_point) #update canvals every 10ms
-    
+    canvas2.after(10, movePoint) #update canvals every 10ms
+
 #show and update time
-def update_time():
-    canvas_1.delete("time") #removes old text
-    current_time = time.strftime("%H:%M:%S") #format string
-    canvas_1.create_text(400, 20, text=current_time, font=font_normal, fill="black", tags="time") #create text
-    root.after(1000, update_time) #recursively update element every second
+def updateTime():
+    canvas1.delete("time") #removes old text
+    currentTime = time.strftime("%H:%M:%S") #format string
+    canvas1.create_text(400, 20, text=currentTime, font=fontNormal, fill="black", tags="time") #create text
+    root.after(1000, updateTime) #recursively update element every second
     
 #change between canvases within the window
-def show_canvas_1(event=None):
-    update_time() #call time function
-    help_canvas.pack_forget() #hide element
-    canvas_1.pack(fill= BOTH, expand= True) #show element
-    canvas_1.create_text(400, 400, text="Press here to begin", font=font_heading, fill="black")
-    help_button.pack()
-    help_button.place(x=750, y=750) #button position on canvas
+def showCanvas1(event=None):
+    updateTime() #call time function
+    helpCanvas.pack_forget() #hide element
+    canvas1.pack(fill= BOTH, expand= True) #show element
+    canvas1.create_text(400, 400, text="Press here to begin", font=fontHeading, fill="black")
+    helpButton.pack()
+    helpButton.place(x=750, y=750) #button position on canvas
     
-def show_canvas_2(event=None):
-    canvas_1.pack_forget()
-    help_button.pack_forget()
-    canvas_2.pack()
+def showCanvas2(event=None):
+    canvas1.pack_forget()
+    helpButton.pack_forget()
+    canvas2.pack()
     
-def show_canvas_3(event=None):
-    canvas_2.pack_forget()
-    canvas_3.pack()
-    canvas_3.create_text(400, 400, text="Press here to close", font=font_heading, fill="black")
+def showCanvas3(event=None):
+    canvas2.pack_forget()
+    canvas3.pack()
+    canvas3.create_text(400, 400, text="Press here to close", font=fontHeading, fill="black")
     
-def show_help_canvas(event=None):
-    canvas_1.pack_forget()
-    help_button.pack_forget()
-    help_canvas.create_text(400, 50, text="Pendle Support", font=font_heading, fill="black")
-    help_canvas.pack()
+def showHelpCanvas(event=None):
+    canvas1.pack_forget()
+    helpButton.pack_forget()
+    helpCanvas.create_text(400, 50, text="Pendle Support", font=fontHeading, fill="black")
+    helpCanvas.pack()
     
-
 #create frame instance
 root = Tk()
 root.title("Pendle")
@@ -121,38 +199,34 @@ root.geometry('800x800') #set geometry
 root.resizable(False, False)
 
 #create font styles
-font_heading = ("Arial", 20, "bold")
-font_normal = ("Arial", 10)
+fontHeading = ("Arial", 20, "bold")
+fontNormal = ("Arial", 10)
 
 #create canvas windows
-canvas_1 = Canvas(root, width=800, height=800)
-canvas_2 = Canvas(root, width=800, height=800)
-canvas_3 = Canvas(root, width=800, height=800)
-help_canvas = Canvas(root, width=800, height=800)
+canvas1 = Canvas(root, width=800, height=800)
+canvas2 = Canvas(root, width=800, height=800)
+canvas3 = Canvas(root, width=800, height=800)
+helpCanvas = Canvas(root, width=800, height=800)
 
 #create canvas buttons
-canvas_1.bind("<Button-1>", show_canvas_2) #make canvas button
-canvas_2.bind("<Button-1>", show_canvas_3)
-canvas_3.bind("<Button-1>", lambda event: root.quit()) #close window
-help_canvas.bind("<Button-1>", show_canvas_1)
+canvas1.bind("<Button-1>", showCanvas2) #make canvas button
+canvas2.bind("<Button-1>", showCanvas3)
+canvas3.bind("<Button-1>", lambda event: root.quit()) #close window
+helpCanvas.bind("<Button-1>", showCanvas1)
 
 #help button
-help_button = Button(canvas_1, text="Help", command=show_help_canvas, relief=FLAT)
-help_icon = PhotoImage(file='assets/icons/question.png')
-help_button.config(image=help_icon)
+helpButton = Button(canvas1, text="Help", command=showHelpCanvas, relief=FLAT)
+helpIcon = PhotoImage(file='assets/icons/question.png')
+helpButton.config(image=helpIcon)
 
 #create a point
-point = canvas_2.create_oval(380, 380, 400, 400, fill="black")
+point = canvas2.create_oval(380, 380, 400, 400, fill="black")
 direction = 'left' #add direction
 
-show_canvas_1() #show main screen
-move_point() #move point
+showCanvas1() #show main screen
+movePoint() #move point
 
-#threading jazz
-#inline
-#t = threading.Thread(target=background_task, daemon=True).start()
-thread = threading.Thread(target=background_task)
-thread.daemon = True #daemon thread to main thread
-thread.start() #start thread
+#Threading jazz
+threading.Thread(target=cardMonitor, daemon=True).start()
 
 root.mainloop()

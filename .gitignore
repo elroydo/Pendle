@@ -111,9 +111,13 @@ celerybeat.pid
 .venv
 env/
 venv/
+vvenv/
 ENV/
 env.bak/
 venv.bak/
+
+# Conda
+mini/
 
 # Spyder project settings
 .spyderproject
