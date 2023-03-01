@@ -1,6 +1,9 @@
+import os
 import time
+import datetime
 import threading
 import numpy as np
+import csv
 import cv2 as cv
 from deepface import DeepFace
 from tkinter import *
@@ -8,7 +11,7 @@ from tkinter import *
 def cardMonitor():
     print('Monitoring...')
 
-    global stopThread, elapsedTime
+    global stopThread, monitoring, elapsedTime, filepath
 
     #load Haar face and eye cascades (face shapes)
     faceCascade = cv.CascadeClassifier(cv.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -46,8 +49,15 @@ def cardMonitor():
     bpmbuffer = 30
     bpmBuffer = np.zeros((bpmbuffer))
 
+    #csv data metrics
+    heartRate = []
+    respirationRate = []
+    emotions = []
+
     #check if camera is accessible
-    if not cap.isOpened():
+    if cap.isOpened():
+        monitoring = True
+    else:
         print("Camera inaccessible...")
         
     while True:
@@ -75,6 +85,7 @@ def cardMonitor():
                 try:
                     emotion = DeepFace.analyze(duality, actions=['emotion'], silent=True) #emotional analysis using
                     dominantEmotion = emotion[0]['dominant_emotion']
+                    emotions.append(dominantEmotion) #add emotion to list
                     print(emotion[0]['dominant_emotion']) #display main emotion
                 except:
                     print('No face detected.') #display error
@@ -116,11 +127,15 @@ def cardMonitor():
             if index % bpmCalculationFrequency == 0: #sampling rate
                 for _ in range(buffer): #iterate through buffer
                     fourierAvg[_] = np.real(fourier[_]).mean() #store real signal averages
-                bpm = 60.0 * frequencies[np.argmax(fourierAvg)] #multiply max values (hertz) by 60 (seconds)
-                bpmBuffer[bpmindex] = bpm #add estimate to buffer
+                bpmTemp = 60.0 * frequencies[np.argmax(fourierAvg)] #multiply max values (hertz) by 60 (seconds)
+                bpmBuffer[bpmindex] = bpmTemp #add estimate to buffer
                 bpmindex = (bpmindex + 1) % bpmbuffer #increment iterating index
-                print('BPM: %d' % bpmBuffer.mean())  #print heart rate
-                print(f'BRPM: {bpmBuffer.mean()//4}') #calculate and print respiration rate
+                bpm = bpmBuffer.mean() #average bpms in buffer 
+                brpm = bpmBuffer.mean()//4 #calculate breathing 
+                heartRate.append(bpm) #add bpm to list
+                respirationRate.append(brpm) #add brpm to list
+                print('BPM: %d' % bpm) #print heart rate
+                print(f'BRPM: {brpm}') #print respiration rate
 
             index = (index + 1) % buffer #increment iterating index
             
@@ -131,7 +146,8 @@ def cardMonitor():
                 up = cv.pyrUp(upROI) #upscale frame
                 upROI = up  #assign upscaled frame
                 pyramid.append(upROI)  #add to list
-            
+
+            #show roi in window
             if len(frame[y1:y2, x1:x2]) == len(pyramid[levels]):
                 frame[y1:y2, x1:x2] = pyramid[levels] * 17
 
@@ -147,6 +163,14 @@ def cardMonitor():
         #termination check
         if stopThread:
             break
+
+    #open the csv file in append mode
+    with open(filepath, mode='a', newline='') as csv_file:
+        writer = csv.writer(csv_file)
+        #write the metrics to the CSV file
+        for metric in zip(heartRate, respirationRate, emotions):
+            writer.writerow(metric) #write data to file
+        print(f'Data written to {filepath}.')
             
     #release capture on closing
     cap.release()
@@ -195,8 +219,9 @@ def showCanvas1(event=None):
     helpButton.place(x=750, y=750) #button position on canvas
     
 def showCanvas2(event=None):
-    global startTime
-    startTime = time.time() #get current time
+    global startTime, monitoring
+    if monitoring: #check if monitor is up and running
+        startTime = time.time() #get current time
     t1.start() #start thread
     canvas1.pack_forget()
     helpButton.pack_forget()
@@ -265,8 +290,25 @@ functionID = 0 #initialise variable
 startTime = time.time() #initialise time
 elapsedTime = int(time.time() - startTime)
 
+#csv jazz
+now = datetime.datetime.now()
+timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+filename = f"data_{timestamp}.csv"
+folder = 'data/'
+filepath = os.path.join(folder, filename) #get the full path
+
+if not os.path.isfile(filepath): #check if file exists
+    headers = ('bpm', 'bpm', 'emotions') #initialise headers
+    with open(filepath, mode='w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['bpm', 'brpm', 'emotions'])
+    print(f'{filepath} created.')
+else:
+    print(f'{filepath} already exists.')
+
 #threading jazz
 t1 = threading.Thread(target=cardMonitor, daemon=True)
+monitoring = False #initialise flag
 stopThread = False #initialise flag
 
 showCanvas1() #show main screen
