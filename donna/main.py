@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import datetime
 import threading
@@ -15,7 +16,7 @@ class monitor:
         global stopThread, monitoring, elapsedTime, filepath
 
         #load Haar face and eye cascades (face shapes)
-        faceCascade = cv.CascadeClassifier(cv.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        faceCascade = cv.CascadeClassifier('./assets/classifiers/haarcascade_frontalface_default.xml')
 
         #initiate video capture
         cap = cv.VideoCapture(0)
@@ -179,6 +180,28 @@ class monitor:
         cap.release()
         cv.destroyAllWindows() #close all windows
         print("Terminating...")
+
+#File and folder jazz (does nothing for now)
+#path to required resources
+def resourcePath(relativePath):
+    try:
+        basePath = sys._MEIPASS
+    except Exception:
+        basePath = os.path.abspath(".")
+
+    return os.path.join(basePath, relativePath)
+
+#check if a directory exists
+def filePath(relativePath):
+    try:
+        #check whether the specified path exists or not
+        isExist = os.path.exists(relativePath)
+        if not isExist:
+        #create a new directory if it does not exist
+            os.makedirs(relativePath)
+            print("The new directory is created.")
+    except:
+        print("Directory error.")
 
 #Canvas jazz
 #point moves left to right repeatedly
