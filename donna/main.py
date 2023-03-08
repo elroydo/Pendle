@@ -1,5 +1,4 @@
 import os
-import sys
 import time
 import datetime
 import threading
@@ -20,8 +19,8 @@ class monitor:
 
         #initiate video capture
         cap = cv.VideoCapture(0)
-        cap.set(cv.CAP_PROP_FRAME_WIDTH, 640) #set camera resolution - width
-        cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480) #set camera resolution - height
+        cap.set(cv.CAP_PROP_FRAME_HEIGHT, 640) #set camera resolution - height
+        cap.set(cv.CAP_PROP_FRAME_WIDTH, 480) #set camera resolution - width
         frameRate = cap.get(cv.CAP_PROP_FPS)  #frames per second
 
         #face parameters
@@ -89,8 +88,9 @@ class monitor:
                         dominantEmotion = emotion[0]['dominant_emotion']
                         emotions.append(dominantEmotion) #add emotion to list
                         print(emotion[0]['dominant_emotion']) #display main emotion
-                    except:
-                        print('No face detected.') #display error
+                    except Exception as e:
+                        emotions.append('') #add blank to list
+                        print(e) #display error
 
                 #Heart rate and breathing
                 #fixed size box around face
@@ -180,7 +180,7 @@ class monitor:
         cap.release()
         cv.destroyAllWindows() #close all windows
         print("Terminating...")
-
+        
 #File and folder jazz (does nothing for now)
 #path to required resources
 def resourcePath(relativePath):
