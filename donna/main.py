@@ -15,12 +15,12 @@ class monitor:
         global stopThread, monitoring, elapsedTime, filepath
 
         #load Haar face and eye cascades (face shapes)
-        faceCascade = cv.CascadeClassifier(cv.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        faceCascade = cv.CascadeClassifier('./assets/classifiers/haarcascade_frontalface_default.xml')
 
         #initiate video capture
         cap = cv.VideoCapture(0)
-        cap.set(cv.CAP_PROP_FRAME_WIDTH, 640) #set camera resolution - width
-        cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480) #set camera resolution - height
+        cap.set(cv.CAP_PROP_FRAME_WIDTH, 480) #set camera resolution - width
+        cap.set(cv.CAP_PROP_FRAME_HEIGHT, 320) #set camera resolution - height
         frameRate = cap.get(cv.CAP_PROP_FPS)  #frames per second
 
         #face parameters
