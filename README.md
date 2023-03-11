@@ -1,4 +1,5 @@
-# Pendle: SRISSS
+# ![pendle](https://user-images.githubusercontent.com/72175303/224467278-24aeab72-96f9-4052-b40f-ae42d3ec3aae.png)   Pendle: SRISSS 
+
 
 Combining Computer Vision with Bilateral Stimulation to Reduce Stress.
 
@@ -14,7 +15,7 @@ Estimating physiological signals:
 ## Installation:
 1. Clone the repository:
 
-    [bella.git](https://github.com/elroydo/bella.git)
+    [Pendle.git](https://github.com/elroydo/Pendle.git)
 
 
 2. Install the dependencies:
