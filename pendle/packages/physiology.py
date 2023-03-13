@@ -41,8 +41,8 @@ class Physiology(threading.Thread):
 
         #Initiate video capture
         cap = cv.VideoCapture(0)
-        cap.set(cv.CAP_PROP_FRAME_HEIGHT, 640) #Set camera resolution - height
-        cap.set(cv.CAP_PROP_FRAME_WIDTH, 480) #Set camera resolution - width
+        cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480) #Set camera resolution - height
+        cap.set(cv.CAP_PROP_FRAME_WIDTH, 320) #Set camera resolution - width
         framerate = cap.get(cv.CAP_PROP_FPS)  #Frames per second
 
         #Face variables
@@ -50,19 +50,18 @@ class Physiology(threading.Thread):
 
         #Index and cache variables
         index = 0
-        cache_size = 100
+        cache_size = 150
         heart_index = 0
-        heart_cahce_size = 30
-        heart_calc_freq = 30
-        heart_cache = np.zeros((heart_cahce_size))
+        heart_cache_size = 15
+        heart_calc_freq = framerate//2
+        heart_cache = np.zeros((heart_cache_size))
         
         #Gaussian pyramid variables
         scale = 3
         ROI_gauss = np.zeros((cache_size, face_box//8, face_box//8, 3))
 
         #Fourier jazz
-        min_freq = 1.0
-        max_freq = 1.8
+        min_freq, max_freq = 0.8, 1.8 #Hz - Sample heart rates in the range of 50-108 bpm
         fourier_average = np.zeros((cache_size))
 
         #Bandpass filter for specific frequencies
@@ -77,7 +76,7 @@ class Physiology(threading.Thread):
         #Frame data
         bpm = 0
         brpm = 0
-        dominant_emotion = 'null'
+        dominant_emotion = ''
 
         #Check if camera is accessible
         if not cap.isOpened():
@@ -150,28 +149,18 @@ class Physiology(threading.Thread):
                     for _ in range(cache_size): #Iterate through cache_size
                         fourier_average[_] = np.real(fourier[_]).mean() #Store signal averages
                     heart_cache[heart_index] = 60.0 * freqs[np.argmax(fourier_average)] #Multiply max values (hertz) by 60 (seconds)
-                    bpm = heart_cache.mean() #Average of bpms in heart values cache 
-                    brpm = bpm//4 #Calculate breathing
+                    heart_index = (heart_index + 1) % heart_cache_size #Increment circular index
 
-                    heart_rate.append(bpm) #Add bpm to list
-                    respiration_rate.append(brpm) #Add brpm to list
-                    
-                    heart_index = (heart_index + 1) % heart_cahce_size #Increment iterating index
+                index = (index + 1) % cache_size #Increment circular index
 
-                index = (index + 1) % cache_size #Increment iterating index
-                
-                #Apply gaussian pyramid function to ROI (scaled up by 3 levels)
-                up_ROI = down_ROI #Temporary holder
-                pyramid = [up_ROI]
-                for _ in range(scale):
-                    up = cv.pyrUp(up_ROI) #Upscale frame
-                    up_ROI = up #Assign upscaled frame
-                    pyramid.append(up_ROI) #Add to list
+                bpm = heart_cache.mean() #Average of bpms in heart values cache 
+                brpm = bpm//4 #Calculate breathing
+                heart_rate.append(bpm) #Add bpm to list
+                respiration_rate.append(brpm) #Add brpm to list
 
                 #Show ROI in window
-                if len(frame[y1:y2, x1:x2]) == len(pyramid[scale]):
-                    frame[y1:y2, x1:x2] = pyramid[scale] * 17
-                    
+                frame[y1:y2, x1:x2] = face_ROI * 170
+
             cv.putText(frame, f'BPM: {bpm}', (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1) #Display bpm
             cv.putText(frame, f'BRPM: {brpm}', (10, 60), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1) #Display brpm
             cv.putText(frame, f'Emotion: {dominant_emotion}', (10, 90), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1) #Display emotion
