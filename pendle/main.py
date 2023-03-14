@@ -34,6 +34,11 @@ def move_point():
     
 #Change between canvases within the window
 def show_start_screen(event=None):
+    global monitor
+    
+    monitor = Physiology() #Create thread instance
+    monitor.start() #Start thread
+    
     help_screen.pack_forget() #Hide element
     end_screen.pack_forget()
     start_screen.create_text(400, 400, text="Press here to begin", font=font_heading, fill="black")
@@ -43,17 +48,15 @@ def show_start_screen(event=None):
     start_screen.pack(fill=BOTH, expand= True) #Show element
     
 def show_waiting_screen(event=None):
-    global monitor
-
-    waiting_screen.create_text(400, 400, text="Calibrating, please wait...", font=font_heading, fill="black")
-
-    monitor = Physiology() #Create thread instance
-    monitor.start() #Start thread
-
+    monitor.toggle_session() #Session in progress
+    
+    waiting_screen.create_text(400, 400, text="Please make yourself comfortable and ensure your face is clearly visible in the camera.",
+                               font=font_heading, fill="black", justify="center", width=700)
+    
     start_screen.pack_forget()
     helpButton.pack_forget()
     waiting_screen.pack(fill=BOTH, expand= True)
-    pendle.after(10000, show_session_screen) #Wait 10 seconds
+    pendle.after(5000, show_session_screen) #Wait 5 seconds
 
 def show_session_screen(event=None):
     global start_time
@@ -65,12 +68,9 @@ def show_session_screen(event=None):
     session_screen.pack(fill=BOTH, expand= True)
 
 def show_post_screen(event=None):
-    global monitor, function_ID
+    monitor.toggle_session() #Session no longer in progress
 
     pendle.after_cancel(function_ID) #Stop function
-
-    monitor.stop() #Stop thread
-    monitor.join() #Allow thread to completely terminate
 
     session_screen.pack_forget()
     post_session_screen.create_text(400, 400, text="Did you notice anything?", font=font_heading, fill="black")
@@ -78,6 +78,9 @@ def show_post_screen(event=None):
     post_session_screen.pack(fill=BOTH, expand= True)
 
 def show_end_screen(event=None):
+    monitor.stop() #Stop thread
+    monitor.join() #Allow thread to completely terminate
+    
     post_session_screen.pack_forget()
     end_screen.create_text(400, 400, text="Press here to close", font=font_heading, fill="black")
     restartButton.pack(fill=BOTH, expand= True)

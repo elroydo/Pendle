@@ -10,23 +10,27 @@ class Physiology(threading.Thread):
     def __init__(self):
         super().__init__(daemon=True) #Kill thread if main is closed
         self.stop_event = threading.Event() #Initialise threading event
+        self.session = False
     
     #Stop thread
     def stop(self):
-        self.stop_event.set()
+        self.stop_event.set() #Sets event
+
+    #Toggle session
+    def toggle_session(self):
+        self.session^=True #Switches between true and false
 
     #CSV jazz
     def save_data(self, data):
         now = datetime.datetime.now()
         timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
         filename = f"data_{timestamp}.csv"
-        folder = 'data/'
-        filepath = os.path.join(folder, filename) #Get full path
+        filepath = os.path.join('data/', filename) #Get full path
 
         if not os.path.isfile(filepath): #Check if file exists
             with open(filepath, mode='a', newline='') as csv_file:
                 writer = csv.writer(csv_file)
-                writer.writerow(['bpm', 'brpm', 'emotions']) #Write headers
+                writer.writerow(['bpm', 'brpm', 'emotions', 'session']) #Write headers
                 for metric in data:
                     writer.writerow(metric) #Write data to file
             print(f'Data written to {filepath}.')
@@ -45,9 +49,6 @@ class Physiology(threading.Thread):
         cap.set(cv.CAP_PROP_FRAME_WIDTH, 320) #Set camera resolution - width
         framerate = cap.get(cv.CAP_PROP_FPS)  #Frames per second
 
-        #Face variables
-        face_box = 200
-
         #Index and cache variables
         index = 0
         cache_size = 150
@@ -58,20 +59,22 @@ class Physiology(threading.Thread):
         
         #Gaussian pyramid variables
         scale = 3
+        face_box = 200
         ROI_gauss = np.zeros((cache_size, face_box//8, face_box//8, 3))
 
         #Fourier jazz
-        min_freq, max_freq = 0.8, 1.8 #Hz - Sample heart rates in the range of 50-108 bpm
         fourier_average = np.zeros((cache_size))
 
         #Bandpass filter for specific frequencies
-        freqs = (1.0*framerate) * np.arange(cache_size) / (1.0 * cache_size)
-        filter = (freqs >= min_freq) & (freqs <= max_freq)
+        min_freq, max_freq = 0.8, 2 #Hz - Sample heart rates in the range of 50-120 bpm
+        freqs = (1.0*framerate) * np.arange(cache_size) / (1.0 * cache_size) #Create array of evenly spaced frequency values
+        filter = (freqs >= min_freq) & (freqs <= max_freq) #Create boolean array to filter frequency values
 
         #CSV data metrics
         heart_rate = []
         respiration_rate = []
         emotions = []
+        session_active = []
         
         #Frame data
         bpm = 0
@@ -92,11 +95,11 @@ class Physiology(threading.Thread):
                 break
             
             #Operations on the frame
-            gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY) #Set frame colour to grey
-            duality = cv.convertScaleAbs(frame, alpha=1.7, beta=0)
+            grey = cv.cvtColor(frame, cv.COLOR_BGR2GRAY) #Set frame colour to grey
+            duality = cv.convertScaleAbs(frame, alpha=1.7, beta=0) #Enhance image for facial feature processing
 
             #Face detection parameters
-            face = face_cascade.detectMultiScale(gray, 1.3, 5)
+            face = face_cascade.detectMultiScale(grey, 1.3, 5)
 
             if len(face) > 0:
                 #Left, top, right, bottom
@@ -108,12 +111,11 @@ class Physiology(threading.Thread):
                     try:
                         emotion = DeepFace.analyze(duality, actions=['emotion'], silent=True) #Emotional analysis
                         dominant_emotion = emotion[0]['dominant_emotion']
-                        emotions.append(dominant_emotion) #Add emotion to list
                     except Exception as e:
                         print(e) #Display error
 
                 #Heart rate and breathing
-                #Fixed size box around face
+                #Calculate centre and fixed size box around face
                 x_center = x + w // 2
                 y_center = y + h // 2
                 half_face_box = face_box // 2
@@ -138,8 +140,8 @@ class Physiology(threading.Thread):
                 if len(pyramid[scale]) == len(ROI_gauss[index]):
                     ROI_gauss[index] = pyramid[scale]
 
-                #Apply sast Fourier tranform function to downscaled gauss frame 
-                fourier = np.fft.fft(ROI_gauss, axis=0) #From vertical dimension (columns)
+                #Apply Fourier tranform function to downscaled gauss frame 
+                fourier = np.fft.fft(ROI_gauss, axis=0) #Compute frequency spectrum along time domain
 
                 #Apply bandpass filter 
                 fourier[filter == False] = 0 #Keep specific frequencies
@@ -152,11 +154,16 @@ class Physiology(threading.Thread):
                     heart_index = (heart_index + 1) % heart_cache_size #Increment circular index
 
                 index = (index + 1) % cache_size #Increment circular index
-
-                bpm = heart_cache.mean() #Average of bpms in heart values cache 
-                brpm = bpm//4 #Calculate breathing
-                heart_rate.append(bpm) #Add bpm to list
-                respiration_rate.append(brpm) #Add brpm to list
+                
+                #Calculate metrics and add to lists
+                if index % framerate == 0:
+                    bpm = heart_cache.mean() #Average of bpms in heart values cache 
+                    brpm = bpm//4 #Ratio heartbeats to breathing
+                    
+                    heart_rate.append(bpm) #Add bpm to list
+                    respiration_rate.append(brpm) #Add brpm to list
+                    emotions.append(dominant_emotion) #Add emotion to list
+                    session_active.append(self.session) #Add session state to list
 
                 #Show ROI in window
                 frame[y1:y2, x1:x2] = face_ROI * 170
@@ -164,6 +171,7 @@ class Physiology(threading.Thread):
             cv.putText(frame, f'BPM: {bpm}', (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1) #Display bpm
             cv.putText(frame, f'BRPM: {brpm}', (10, 60), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1) #Display brpm
             cv.putText(frame, f'Emotion: {dominant_emotion}', (10, 90), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1) #Display emotion
+            cv.putText(frame, f'Session: {self.session}', (10, 120), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1) #Display session state
 
             #Show frames in a window
             if frame is not None:
@@ -171,11 +179,11 @@ class Physiology(threading.Thread):
                 cv.waitKey(1)
         
         #Zip data making it iterable
-        data = zip(heart_rate, respiration_rate, emotions)
+        data = zip(heart_rate, respiration_rate, emotions, session_active)
         #Save data to CSV file
         self.save_data(data)
-                
-        #Release capture on closing
-        cap.release()
+        
+        #Clean up
         cv.destroyAllWindows() #Close all windows
+        cap.release() #Close camera capture
         print("Terminating...")
