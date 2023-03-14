@@ -25,9 +25,15 @@ class Physiology(threading.Thread):
         now = datetime.datetime.now()
         timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
         filename = f"data_{timestamp}.csv"
-        filepath = os.path.join('data/', filename) #Get full path
+        folder = 'data/'
+        filepath = os.path.join(folder, filename) #Get full path
 
-        if not os.path.isfile(filepath): #Check if file exists
+        #Create data folder if it doesn't exist
+        if not os.path.exists(folder):
+                os.makedirs(folder)
+        
+        #Create data file if it doesn't exist
+        if not os.path.isfile(filepath): #Check if file exists 
             with open(filepath, mode='a', newline='') as csv_file:
                 writer = csv.writer(csv_file)
                 writer.writerow(['bpm', 'brpm', 'emotions', 'session']) #Write headers
@@ -137,8 +143,10 @@ class Physiology(threading.Thread):
                     pyramid.append(down_ROI) #Add to list
 
                 #Add downscaled gauss frame to index in list
-                if len(pyramid[scale]) == len(ROI_gauss[index]):
+                try:
                     ROI_gauss[index] = pyramid[scale]
+                except Exception as e:
+                    print(e)
 
                 #Apply Fourier tranform function to downscaled gauss frame 
                 fourier = np.fft.fft(ROI_gauss, axis=0) #Compute frequency spectrum along time domain
