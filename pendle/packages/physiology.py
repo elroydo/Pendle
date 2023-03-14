@@ -45,8 +45,8 @@ class Physiology(threading.Thread):
 
         #Initiate video capture
         cap = cv.VideoCapture(0)
-        cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480) #Set camera resolution - height
-        cap.set(cv.CAP_PROP_FRAME_WIDTH, 320) #Set camera resolution - width
+        cap.set(3, 600) #Set camera resolution - height
+        cap.set(4, 600) #Set camera resolution - width
         framerate = cap.get(cv.CAP_PROP_FPS)  #Frames per second
 
         #Index and cache variables
