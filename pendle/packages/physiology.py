@@ -174,7 +174,7 @@ class Physiology(threading.Thread):
                     session_active.append(self.session) #Add session state to list
 
                 #Show ROI in window
-                frame[y1:y2, x1:x2] = face_ROI * 170
+                frame[y1:y2, x1:x2] = cv.pyrUp(cv.pyrDown(face_ROI)) * 170
 
             cv.putText(frame, f'BPM: {bpm}', (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1) #Display bpm
             cv.putText(frame, f'BRPM: {brpm}', (10, 60), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1) #Display brpm

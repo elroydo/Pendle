@@ -31,6 +31,15 @@ def move_point():
         show_post_screen() #Display next screen
     else:
         function_ID = session_screen.after(10, move_point) #Update canvas every 10ms
+
+#Toggle canvases
+def toggle_canvas(canvas, prev_canvas=None):
+    if prev_canvas:
+        prev_canvas.pack_forget()
+    if canvas.winfo_viewable():
+        canvas.pack_forget()
+    else:
+        canvas.pack()
     
 #Change between canvases within the window
 def show_start_screen(event=None):
@@ -93,18 +102,18 @@ def show_help_screen(event=None):
     help_screen.create_text(400, 50, text="Pendle Support", font=font_heading, fill="black")
     #Main topic
     help_screen.create_rectangle(50, 100, 750, 350, fill="#f5f5f7", outline="#f5f5f7")
-    help_screen.create_text(400, 130, text="A 5-Minute Relaxation Session", font=font_sub_heading, fill="black")
-    help_screen.create_text(400, 180, text="A moving point as a visual signal uses your rhythmic horizontal eye movements to help you remain calm and relaxed.", 
+    help_screen.create_text(400, 130, text="Your 5-Minute relaxation session", font=font_sub_heading, fill="black")
+    help_screen.create_text(400, 230, text="Using a swinging point as bilateral stimulation from Eye-Movement Desensitisation and Reprocessing (EMDR) therapy as a tool to help you process your experiences while staying calm and relaxed.", 
                            font=font_sub_heading2, fill="black", justify="center", width=600)
     #Topic two
     help_screen.create_rectangle(50, 370, 390, 700, fill="#f5f5f7", outline="#f5f5f7")
-    help_screen.create_text(220, 400, text="Monitoring", font=font_sub_heading, fill="black")
-    help_screen.create_text(220, 450, text="Once the session begins, your heart rate, breathing, and emotions will be monitored and recorded.", 
+    help_screen.create_text(220, 400, text="Monitoring your body", font=font_sub_heading, fill="black")
+    help_screen.create_text(220, 530, text="Once the session begins, your heart rate, breathing, and emotions will be monitored and recorded.", 
                            font=font_sub_heading2, fill="black", justify="center", width=300)
     #Topic three
     help_screen.create_rectangle(410, 370, 750, 700, fill="#f5f5f7", outline="#f5f5f7")
-    help_screen.create_text(580, 400, text="Feedback", font=font_sub_heading, fill="black")
-    help_screen.create_text(580, 450, text="From time to time you will see instructions on the screen to follow such as taking a deep breath.", 
+    help_screen.create_text(580, 400, text="Giving you feedback", font=font_sub_heading, fill="black")
+    help_screen.create_text(580, 530, text="From time to time you will see instructions on the screen to follow such as taking a deep breath.", 
                            font=font_sub_heading2, fill="black", justify="center", width=300)
     help_screen.create_text(400, 750, text="Press here to go back", font=font_sub_heading, fill="black")
     help_screen.pack(fill=BOTH, expand= True)
@@ -137,7 +146,7 @@ help_screen = Canvas(pendle, width=screen_width, height=screen_height) #Help
 start_screen.bind("<Button-1>", show_waiting_screen) #To Waiting screen 
 session_screen.bind("<Button-1>", show_post_screen) #To Post-session screen 
 post_session_screen.bind("<Button-1>", show_end_screen) #To End screen 
-help_screen.bind("<Button-1>", show_start_screen) #To Start screen 
+help_screen.bind("<Button-1>", lambda event: toggle_canvas(start_screen, help_screen)) #To Start screen 
 end_screen.bind("<Button-1>", lambda event: pendle.quit()) #Quit application 
 
 #Buttons
