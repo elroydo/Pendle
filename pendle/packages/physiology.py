@@ -1,4 +1,5 @@
 import os
+import time
 import datetime
 import threading
 import numpy as np
@@ -83,6 +84,7 @@ class Physiology(threading.Thread):
         session_active = []
         
         #Frame data
+        last_time = time.time()
         bpm = 0
         brpm = 0
         dominant_emotion = ''
@@ -93,8 +95,13 @@ class Physiology(threading.Thread):
         
         #Check stopping thread condition
         while not self.stop_event.is_set():
+            #Timing variables
+            current_time = time.time()
+            elapsed_time = current_time - last_time
+            
             #Capture each frame
             check, frame = cap.read()
+            
             #Set check to true if frame is read correctly
             if not check:
                 print("Missing frames, ending capture...")
@@ -109,16 +116,7 @@ class Physiology(threading.Thread):
 
             if len(face) > 0:
                 #Left, top, right, bottom
-                (x, y, w, h) = face[0] #Extract face coordinates
-
-                #Emotion recognition using Deepface
-                cv.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-                if index % framerate ==  0:
-                    try:
-                        emotion = DeepFace.analyze(duality, actions=['emotion'], silent=True) #Emotional analysis
-                        dominant_emotion = emotion[0]['dominant_emotion']
-                    except Exception as e:
-                        print(e) #Display error
+                (x, y, w, h) = face[0] #Extract face coordinates            
 
                 #Heart rate and breathing
                 #Calculate centre and fixed size box around face
@@ -129,6 +127,9 @@ class Physiology(threading.Thread):
                 y1 = max(y_center - half_face_box, 0)
                 x2 = min(x_center + half_face_box, frame.shape[1])
                 y2 = min(y_center + half_face_box, frame.shape[0])
+                
+                #Display boxes around detected face
+                cv.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
                 cv.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 255), 2)
 
                 #Extract ROI from frame
@@ -163,8 +164,16 @@ class Physiology(threading.Thread):
 
                 index = (index + 1) % cache_size #Increment circular index
                 
-                #Calculate metrics and add to lists
-                if index % framerate == 0:
+                #Every second
+                if elapsed_time >= 1.0:
+                    #Emotion recognition using Deepface
+                    try:
+                        emotion = DeepFace.analyze(duality, actions=['emotion'], silent=True) #Emotional analysis
+                        dominant_emotion = emotion[0]['dominant_emotion']
+                    except Exception as e:
+                        print(e) #Display error
+                    
+                    #Calculate metrics and add to lists
                     bpm = heart_cache.mean() #Average of bpms in heart values cache 
                     brpm = bpm//4 #Ratio heartbeats to breathing
                     
@@ -172,9 +181,15 @@ class Physiology(threading.Thread):
                     respiration_rate.append(brpm) #Add brpm to list
                     emotions.append(dominant_emotion) #Add emotion to list
                     session_active.append(self.session) #Add session state to list
+                    
+                    #Reset time
+                    last_time = current_time
 
                 #Show ROI in window
-                frame[y1:y2, x1:x2] = cv.pyrUp(cv.pyrDown(face_ROI)) * 170
+                try:
+                    frame[y1:y2, x1:x2] = cv.pyrUp(cv.pyrDown(face_ROI)) * 170
+                except Exception as e:
+                    print(e)
 
             cv.putText(frame, f'BPM: {bpm}', (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1) #Display bpm
             cv.putText(frame, f'BRPM: {brpm}', (10, 60), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1) #Display brpm
