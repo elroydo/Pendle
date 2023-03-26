@@ -1,16 +1,18 @@
-import os
 import time
-import datetime
 import threading
 import numpy as np
-import csv
 import cv2 as cv
 from deepface import DeepFace
+
+from .csv_handler import CSVHandler
+from .database import PendleDatabase
 
 class Physiology(threading.Thread):
     def __init__(self):
         super().__init__(daemon=True) #Kill thread if main is closed
         self.stop_event = threading.Event() #Initialise threading event
+        self.db = PendleDatabase()
+        self.csv_handler = CSVHandler()
         self.session = False
     
     #Stop thread
@@ -20,29 +22,6 @@ class Physiology(threading.Thread):
     #Toggle session
     def toggle_session(self):
         self.session^=True #Switches between true and false
-
-    #CSV jazz
-    def save_data(self, data):
-        now = datetime.datetime.now()
-        timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"data_{timestamp}.csv"
-        folder = 'data/'
-        filepath = os.path.join(folder, filename) #Get full path
-
-        #Create data folder if it doesn't exist
-        if not os.path.exists(folder):
-                os.makedirs(folder)
-        
-        #Create data file if it doesn't exist
-        if not os.path.isfile(filepath): #Check if file exists 
-            with open(filepath, mode='a', newline='') as csv_file:
-                writer = csv.writer(csv_file)
-                writer.writerow(['bpm', 'brpm', 'emotions', 'session']) #Write headers
-                for metric in data:
-                    writer.writerow(metric) #Write data to file
-            print(f'Data written to {filepath}.')
-        else:
-            print(f'{filepath} already exists.')
 
     def run(self):
         print('Monitoring...')
@@ -54,7 +33,7 @@ class Physiology(threading.Thread):
         cap = cv.VideoCapture(0)
         cap.set(3, 600) #Set camera resolution - height
         cap.set(4, 600) #Set camera resolution - width
-        framerate = cap.get(cv.CAP_PROP_FPS)  #Frames per second
+        framerate = cap.get(cv.CAP_PROP_FPS) #Frames per second
 
         #Index and cache variables
         index = 0
@@ -187,7 +166,8 @@ class Physiology(threading.Thread):
 
                 #Show ROI in window
                 try:
-                    frame[y1:y2, x1:x2] = cv.pyrUp(cv.pyrDown(face_ROI)) * 170
+                    frame[y1:y2, x1:x2] = cv.pyrUp(cv.pyrUp(cv.pyrUp(pyramid[scale]))) * 170
+                    frame[150:150+25, 10:10+25] = pyramid[scale] #Demo
                 except Exception as e:
                     print(e)
 
@@ -203,8 +183,12 @@ class Physiology(threading.Thread):
         
         #Zip data making it iterable
         data = zip(heart_rate, respiration_rate, emotions, session_active)
+        # Convert to list
+        data_list = list(data)
+        # Save data to database
+        self.db.add_data(data_list)
         #Save data to CSV file
-        self.save_data(data)
+        self.csv_handler.save_data(data_list)
         
         #Clean up
         cv.destroyAllWindows() #Close all windows
