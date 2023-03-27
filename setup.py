@@ -2,24 +2,15 @@ import setuptools
 
 setuptools.setup(
     name="pendle",
-    version="0.9.9",
+    version="0.23",
     description="Pendle: SRISSS",
-    author="elroy D",
+    author="elroyD",
     packages=setuptools.find_packages(),
     install_requires=[
         "opencv-python",
         "numpy",
-        "pandas",
-        "Pillow",
-        "tensorflow",
-        "mtcnn",
-        "keras",
-        "retina-face",
         "deepface",
-        "Flask",
-        "fire",
-        "gdown",
-        "tqdm"
+        "sqlalchemy",
     ],
     python_requires='>=3.6',
 )
