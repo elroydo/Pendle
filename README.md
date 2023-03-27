@@ -1,14 +1,13 @@
 # ![pendle](https://user-images.githubusercontent.com/72175303/224467278-24aeab72-96f9-4052-b40f-ae42d3ec3aae.png)   **Pendle: SRISSS, a Stress Reduction Information System Software Solution**
-## **Combining Computer Vision with Bilateral Stimulation to Reduce Stress.**
+### **Combining Computer Vision with Bilateral Stimulation to Reduce Stress.**
 
-
-### **Computer Vision:**
+#### **Computer Vision:**
  - Pendle will monitor and record your heart rate, breathing, and emotions.
-### **Bilateral Stimulation:**
+#### **Bilateral Stimulation:**
  - Pendle uses a swinging ball, inspired by Eye-Movement Desensitisation and Reprocessing (EMDR) therapy, to help you process your experiences while feeling calm and relaxed.
-### **Relaxation Session:**
+#### **Relaxation Session:**
  - Stay focused and follow the moving object and instructions on your screen, like taking a deep breath.
-<hr/>
+
 <br/>
 
 ## **Installation:**
@@ -25,17 +24,16 @@
 
     `python main.py`
 
-<br/>
 
 ### **Modules**
-Libraries | Command
+Library | Description
 --- | ---
 Tkinter | GUI toolkit
 OpenCV | SQL toolkit and object-relational mapper
 Numpy | Real time computer vision
 Deepface | Face recognition and facial attribute analysis (emotions)
 SQLAlchemy | SQL toolkit and Object Relational Mapper
-<hr/>
+
 <br/>
 
 ## **Acknowledgments**
@@ -65,7 +63,7 @@ Tangirala, R. (2018) Eulerian remote heartrate detection, GitHub. Available at: 
 Question free icons designed by Freepik (2017) Flaticon. Available at: https://www.flaticon.com/free-icon/question_471664
 
 Reload free icons designed by Freepik (2013) Flaticon. Available at: https://www.flaticon.com/free-icon/reload_25051
-<hr/>
+
 
 <br/><br/>
 . . .
