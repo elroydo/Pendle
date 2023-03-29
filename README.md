@@ -43,26 +43,19 @@ Extending my utmost gratitude Dr Patel
 
 <br/>
 
-## **Credits**
+## **References**
 
-Heathcote, J. (2013) HeartMonitor, GitHub. Available at: https://github.com/mossblaser/HeartMonitor
-
-Hearn, T., Ford, M., Roughan, A. (2013) Webcam pulse detector, GitHub. Available at: https://github.com/thearn/webcam-pulse-detector
-
-Nguyen, H. (2018) Heart rate measurement using camera, GitHub. Available at: https://github.com/habom2310/Heart-rate-measurement-using-camera
-
-Oved, G. (2018) Webcam heart rate monitor, GitHub. Available at: https://github.com/giladoved/webcam-heart-rate-monitor
-
-Serengil, S.I. (2020) Deepface: A lightweight face recognition and facial attribute analysis (age, gender, emotion and race) library for python, GitHub. Available at: https://github.com/serengil/deepface
-
-Tangirala, R. (2018) Eulerian remote heartrate detection, GitHub. Available at: https://github.com/rohintangirala/eulerian-remote-heartrate-detection
+ - Nguyen, H. (2018) Heart rate measurement using camera, GitHub. Available at: https://github.com/habom2310/Heart-rate-measurement-using-camera
+ - Oved, G. (2018) Webcam heart rate monitor, GitHub. Available at: https://github.com/giladoved/webcam-heart-rate-monitor
+ - Rahman, H., Ahmed, M.U., Begum, S., & Funk, P. (2016). Real Time Heart Rate Monitoring From Facial RGB Color Video Using Webcam. Annual Workshop of the Swedish Artificial Intelligence Society.
+ - Serengil, S.I. (2020) Deepface: A lightweight face recognition and facial attribute analysis (age, gender, emotion and race) library for python, GitHub. Available at: https://github.com/serengil/deepface
+ - Tangirala, R. (2018) Eulerian remote heartrate detection, GitHub. Available at: https://github.com/rohintangirala/eulerian-remote-heartrate-detection
 
 <br/>
 
 ## **Attributions**
-Question free icons designed by Freepik (2017) Flaticon. Available at: https://www.flaticon.com/free-icon/question_471664
-
-Reload free icons designed by Freepik (2013) Flaticon. Available at: https://www.flaticon.com/free-icon/reload_25051
+ - Question free icons designed by Freepik (2017) Flaticon. Available at: https://www.flaticon.com/free-icon/question_471664
+ - Reload free icons designed by Freepik (2013) Flaticon. Available at: https://www.flaticon.com/free-icon/reload_25051
 
 
 <br/><br/>
