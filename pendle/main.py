@@ -191,7 +191,7 @@ elapsed_time = int(time.time() - start_time)  # Initialise elapsed time
 monitor = Physiology()
 
 # Show start screen
-show_start_screen() # Show main screen
+show_start_screen()
 
 # Run GUI
 pendle.mainloop()

@@ -4,6 +4,9 @@ import numpy as np
 import cv2 as cv
 from deepface import DeepFace
 
+from .resp_rate import calculate_brpm
+from .analyse_emotion import get_dominant_emotion
+from .plot_utils import plot_signals
 from .csv_handler import CSVHandler
 from .database import PendleDatabase
 
@@ -35,9 +38,9 @@ class Physiology(threading.Thread):
 
         # Index and cache variables
         index = 0
-        cache_size = 150
+        cache_size = 30
         heart_index = 0
-        heart_cache_size = 15
+        heart_cache_size = 30
         heart_cache = np.zeros((heart_cache_size))
         
         # Gaussian pyramid variables
@@ -82,8 +85,11 @@ class Physiology(threading.Thread):
                 print("Missing frames, ending capture...")
                 break
 
-            # Face detection parameters; set frame colour to grey
-            face = face_cascade.detectMultiScale(cv.cvtColor(frame, cv.COLOR_BGR2GRAY), 1.3, 5)
+            # Pre-processing; enhance frames
+            gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+            
+            # Face detection parameters
+            face = face_cascade.detectMultiScale(gray_frame, 1.3, 5)
 
             if len(face) > 0:
                 (x, y, w, h) = face[0] # Extract face coordinates            
@@ -123,16 +129,10 @@ class Physiology(threading.Thread):
                 
                 # Estimate emotions, heart rate, and breathing very second
                 if elapsed_time >= 1.0:
-                    # Emotion recognition using Deepface
-                    try: # Enhance image for facial feature processing
-                        emotion = DeepFace.analyze(cv.convertScaleAbs(frame, alpha=1.7, beta=0), actions=['emotion'], silent=True) # Emotional analysis
-                        dominant_emotion = emotion[0]['dominant_emotion']
-                    except Exception as e:
-                        print(e) # Display error
-                    
                     # Calculate metrics and add to lists
                     bpm = heart_cache.mean() # Average of bpms in heart values cache 
-                    brpm = bpm//4 # Ratio heartbeats to breathing
+                    brpm = calculate_brpm(bpm) # Ratio heartbeats to breathing
+                    dominant_emotion = get_dominant_emotion(frame)
                     
                     # Add data to lists
                     heart_rate.append(bpm) # Add bpm to list
@@ -145,8 +145,9 @@ class Physiology(threading.Thread):
 
                 # Show ROI in window
                 try:
-                    frame[y1:y2, x1:x2] = face_ROI * 170
                     frame[90:90+25, 10:10+25] = down_ROI # Demo
+                    frame[120:120+face_box, 10:10+face_box] = face_ROI * 170
+                    frame[y1:y2, x1:x2] = cv.pyrUp(cv.pyrUp(cv.pyrUp(down_ROI))) * 170
                 except Exception as e:
                     print(e)
 
