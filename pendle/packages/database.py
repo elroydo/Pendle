@@ -15,6 +15,7 @@ class PendleDatabase:
         
         # Define the table structure
         self.my_table = Table('user_data', self.metadata,
+            Column('timestamp', String),
             Column('bpm', Float),
             Column('brpm', Float),
             Column('emotions', String),
@@ -28,7 +29,7 @@ class PendleDatabase:
         # Convert the data into a list of dictionaries
         dict_data = []
         for row in data:
-            dict_data.append({'bpm': row[0], 'brpm': row[1], 'emotions': row[2], 'session': row[3]})
+            dict_data.append({'timestamp': row[0], 'bpm': row[1], 'brpm': row[2], 'emotions': row[3], 'session': row[4]})
 
         #Insert the data into the database
         with self.engine.connect() as conn:
@@ -38,6 +39,6 @@ class PendleDatabase:
     # Retrieve all rows from the user_data table in the database
     def get_data(self):
         with self.engine.connect() as conn:
-            stmt = select(self.my_table.c.bpm, self.my_table.c.brpm, self.my_table.c.emotions, self.my_table.c.session)
+            stmt = select(self.my_table.c.timestamp, self.my_table.c.bpm, self.my_table.c.brpm, self.my_table.c.emotions, self.my_table.c.session)
             results = conn.execute(stmt)
             return results.fetchall()

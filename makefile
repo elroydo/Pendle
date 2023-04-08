@@ -8,10 +8,10 @@ run:
 	python donna/main.py
 
 test:
-	python -m pytest -x donna/tests
+	python -m pytest -x pendle/tests
 
 venvactivate:
 	py.test tests
 
 clean:
-	rm -rf donna/__pycache__
+	rm -rf pendle/__pycache__
