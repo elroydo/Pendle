@@ -17,7 +17,7 @@ class CSVHandler:
         if not os.path.isfile(self.file_path): #Check if file exists 
             with open(self.file_path, mode='a', newline='') as csv_file:
                 writer = csv.writer(csv_file)
-                writer.writerow(['bpm', 'brpm', 'emotions', 'session']) #Write headers
+                writer.writerow(['timestamp', 'bpm', 'brpm', 'emotions', 'session']) #Write headers
                 for metric in data:
                     writer.writerow(metric) #Write data to file
             print(f'Data written to {self.file_path}.')
@@ -29,5 +29,5 @@ class CSVHandler:
         with open(self.file_path, mode='r') as csv_file:
             reader = csv.reader(csv_file)
             headers = next(reader)  # skip headers
-            data = [[float(row[0]), float(row[1]), row[2], True if row[3].lower() == 'true' else False] for row in reader]
+            data = [[row[0], float(row[1]), float(row[2]), row[3], True if row[4].lower() == 'true' else False] for row in reader]
         return data

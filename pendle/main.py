@@ -77,20 +77,20 @@ def show_waiting_screen(event=None):
 
 def show_session_screen(event=None):
     global start_time
-     # Set start time and session in progress
+    # Set start time and session in progress
     start_time = time.time()
     monitor.toggle_session()
     move_ball()
     toggle_canvas(session_screen, waiting_screen)
 
 def show_post_screen(event=None):
-     # Set Session inactive and stop function
+    # Set Session inactive and stop function
     monitor.toggle_session()
     pendle.after_cancel(function_ID)
     toggle_canvas(post_session_screen, session_screen)
 
 def show_end_screen(event=None):
-     # Stop thread allowing it to completely terminate
+    # Stop thread allowing it to completely terminate
     monitor.stop()
     monitor.join()
     toggle_canvas(end_screen, post_session_screen)
