@@ -53,9 +53,10 @@ class Physiology(threading.Thread):
     # Face detection & tracking; return first face
     def detect_faces(self, grey_frame, classifier):
         faces = classifier.detectMultiScale(grey_frame, 1.3, 5)
-        if len(faces) > 1:
+        if len(faces) >= 1:
             face = faces[:1]
             return face
+        return []
     
     # Extract ROI and coordinates
     def extract_roi(self, frame, face, face_box):
