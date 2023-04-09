@@ -26,11 +26,47 @@ class Physiology(threading.Thread):
     def toggle_session(self):
         self.session ^= True
     
+    # Initialise first detected camera device
+    def initialise_camera(self):
+        for i in range(10):
+            cap = cv.VideoCapture(i)
+            if cap.isOpened():
+                return cap
+        if not cap.isOpened():
+            print("Camera inaccessible...")
+        return cap
+    
+    # Read frames from camera
+    def read_frames(self, capture):
+        check, frame = capture.read()
+        if not check:
+            print("Missing frames...")
+            return check, None
+        return check, frame
+    
     # Enhance frames
     def preprocessing(self, frame):
         gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
         alpha = cv.convertScaleAbs(frame, alpha=1.7, beta=0)
         return gray, alpha
+    
+    # Face detection & tracking; return first face
+    def detect_faces(self, grey_frame, classifier):
+        faces = classifier.detectMultiScale(grey_frame, 1.3, 5)
+        if len(faces) > 1:
+            face = faces[:1]
+            return face
+    
+    # Extract ROI and coordinates
+    def extract_roi(self, frame, face, face_box):
+        # Extract first face coordinates
+        (x, y, w, h) = face[0]
+        
+        # Calculate centre and fixed size box around face
+        x1, y1 = max(x + w // 2 - face_box // 2,0), max(y + h // 2 - face_box // 2, 0)
+        x2, y2 = min(x1 + face_box, frame.shape[1]), min(y1 + face_box, frame.shape[0])
+        
+        return frame[y1:y2, x1:x2], x1, y1, x2, y2
     
     # Apply gaussian pyramid function to ROI (scaled down image 3 levels)
     def build_pyramid(self, ROI):
@@ -39,9 +75,11 @@ class Physiology(threading.Thread):
             down_ROI = cv.pyrDown(down_ROI)
         return down_ROI
     
+    # Calculate pulse
     def calculate_pulse(self, hertz):
         return hertz * 60
     
+    # Calculate heart rate
     def calculate_bpm(self, cache):
         return cache.mean()
         
@@ -62,12 +100,12 @@ class Physiology(threading.Thread):
     def run(self):
         print('Monitoring...')
 
+        # Initiate video capture
+        cap = self.initialise_camera()
+        framerate = cap.get(cv.CAP_PROP_FPS) # Frames per second
+        
         # Load Haar face shape classifier
         face_cascade = cv.CascadeClassifier('./assets/classifiers/haarcascade_frontalface_default.xml')
-
-        # Initiate video capture
-        cap = cv.VideoCapture(0)
-        framerate = cap.get(cv.CAP_PROP_FPS) # Frames per second
 
         # Index and cache variables
         index = 0
@@ -102,10 +140,6 @@ class Physiology(threading.Thread):
         start_time = time.time()
         last_time = time.time()
 
-        # Check if camera is accessible
-        if not cap.isOpened():
-            print("Camera inaccessible...")
-
         # Check stopping thread condition
         while not self.stop_event.is_set():
             # Timing variables
@@ -113,29 +147,17 @@ class Physiology(threading.Thread):
             elapsed_time = current_time - last_time
 
             # Capture each frame
-            check, frame = cap.read()
-
-            # Set check to true if frame is read correctly
-            if not check:
-                print("Missing frames, ending capture...")
-                break
+            check, frame = self.read_frames(cap)
 
             # Pre-processing; enhance frames
-            gray_frame, alpha_frame = self.preprocessing(frame)
+            grey_frame, alpha_frame = self.preprocessing(frame)
 
-            # Face detection parameters
-            face = face_cascade.detectMultiScale(gray_frame, 1.3, 5)
+            # Face detection & tracking parameters
+            face = self.detect_faces(grey_frame, face_cascade)
 
             if len(face) > 0:
-                # Extract face coordinates
-                (x, y, w, h) = face[0]
-
-                # Calculate centre and fixed size box around face
-                x1, y1 = max(x + w // 2 - face_box // 2,0), max(y + h // 2 - face_box // 2, 0)
-                x2, y2 = min(x1 + face_box, frame.shape[1]), min(y1 + face_box, frame.shape[0])
-
-                # Extract ROI from frame
-                face_ROI = frame[y1:y2, x1:x2]
+                # Extract ROI & coordinates from frame
+                face_ROI, x1, y1, x2, y2 = self.extract_roi(frame, face, face_box)
 
                 # Build pyramid and add downscaled frame to index in list
                 try:
