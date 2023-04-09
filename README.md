@@ -1,4 +1,4 @@
-# ![pendle](https://user-images.githubusercontent.com/72175303/224467278-24aeab72-96f9-4052-b40f-ae42d3ec3aae.png)   **Pendle: SRISSS, a Stress Reduction Information System Software Solution**
+# **Pendle: SRISSS, a Stress Reduction Information System Software Solution**
 ### **Combining Computer Vision with Bilateral Stimulation to Reduce Stress.**
 
 #### **Computer Vision:**
