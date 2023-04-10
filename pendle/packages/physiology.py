@@ -17,7 +17,47 @@ class Physiology(threading.Thread):
         self.db = PendleDatabase()
         self.csv_handler = CSVHandler()
         self.session = False
+        
+        # Load Haar face shape classifier
+        self.face_cascade = cv.CascadeClassifier('./assets/classifiers/haarcascade_frontalface_default.xml')
 
+        # Initiate video capture
+        self.cap = self.initialise_camera()
+        self.framerate = self.cap.get(cv.CAP_PROP_FPS) # Frames per second
+
+        # Index and cache variables
+        self.index = 0
+        self.cache_size = 100
+        self.heart_index = 0
+        self.heart_cache_size = 15
+        self.heart_cache = np.zeros((self.heart_cache_size))
+
+        # Gaussian pyramid variables
+        self.face_box = 200
+        self.ROI_gauss = np.zeros((self.cache_size, self.face_box//8, self.face_box//8, 3))
+
+        # Create array of evenly spaced frequency values
+        self.freqs = (1.0*self.framerate//2) * np.arange(self.cache_size) / (1.0 * self.cache_size)
+
+        # Bandpass filter for specific frequencies - Keep heart rates in the range of 50-120 bpm
+        self.filter = (self.freqs >= 0.8) & (self.freqs <= 2)
+
+        # Data metrics
+        self.timestamp_list = []
+        self.heart_rate = []
+        self.respiration_rate = []
+        self.emotions = []
+        self.session_active = []
+
+        # Frame data
+        self.bpm = 0
+        self.brpm = 0
+        self.dominant_emotion = ''
+
+        # Miscellaneous
+        self.start_time = time.time()
+        self.last_time = time.time()
+    
     # Stop thread
     def stop(self):
         self.stop_event.set()
@@ -91,140 +131,101 @@ class Physiology(threading.Thread):
     # Emotion recognition using Deepface
     def get_dominant_emotion(self, alpha_frame):
         try:
-            emotion = DeepFace.analyze(alpha_frame, actions=['emotion'], silent=True)
+            emotion = DeepFace.analyze(alpha_frame, actions=['emotion'], silent=True, enforce_detection=False)
             dominant_emotion = emotion[0]['dominant_emotion']
             return dominant_emotion
         except Exception as e:
-            print(e)
+            print('Emotion could not be detected.')
             return None
 
     def run(self):
         print('Monitoring...')
 
-        # Initiate video capture
-        cap = self.initialise_camera()
-        framerate = cap.get(cv.CAP_PROP_FPS) # Frames per second
-        
-        # Load Haar face shape classifier
-        face_cascade = cv.CascadeClassifier('./assets/classifiers/haarcascade_frontalface_default.xml')
-
-        # Index and cache variables
-        index = 0
-        cache_size = 100
-        heart_index = 0
-        heart_cache_size = 15
-        heart_cache = np.zeros((heart_cache_size))
-
-        # Gaussian pyramid variables
-        face_box = 200
-        ROI_gauss = np.zeros((cache_size, face_box//8, face_box//8, 3))
-
-        # Create array of evenly spaced frequency values
-        freqs = (1.0*framerate//2) * np.arange(cache_size) / (1.0 * cache_size)
-
-        # Bandpass filter for specific frequencies - Keep heart rates in the range of 50-120 bpm
-        filter = (freqs >= 0.8) & (freqs <= 2)
-
-        # Data metrics
-        timestamp_list = []
-        heart_rate = []
-        respiration_rate = []
-        emotions = []
-        session_active = []
-
-        # Frame data
-        bpm = 0
-        brpm = 0
-        dominant_emotion = ''
-
-        # Miscellaneous
-        start_time = time.time()
-        last_time = time.time()
-
         # Check stopping thread condition
         while not self.stop_event.is_set():
             # Timing variables
             current_time = time.time()
-            elapsed_time = current_time - last_time
+            elapsed_time = current_time - self.last_time
 
             # Capture each frame
-            check, frame = self.read_frames(cap)
+            check, frame = self.read_frames(self.cap)
 
             # Pre-processing; enhance frames
             grey_frame, alpha_frame = self.preprocessing(frame)
 
             # Face detection & tracking parameters
-            face = self.detect_faces(grey_frame, face_cascade)
+            face = self.detect_faces(grey_frame, self.face_cascade)
 
             if len(face) > 0:
                 # Extract ROI & coordinates from frame
-                face_ROI, x1, y1, x2, y2 = self.extract_roi(frame, face, face_box)
+                face_ROI, x1, y1, x2, y2 = self.extract_roi(frame, face, self.face_box)
 
                 # Build pyramid and add downscaled frame to index in list
                 try:
                     ROI_pyramid = self.build_pyramid(face_ROI)
-                    ROI_gauss[index] = ROI_pyramid
+                    self.ROI_gauss[self.index] = ROI_pyramid
                 except Exception as e:
                     print(e)
 
                 # Apply Fourier tranform function to downscaled frame
-                fourier = np.fft.fft(ROI_gauss, axis=0)
+                fourier = np.fft.fft(self.ROI_gauss, axis=0)
 
                 # Apply bandpass filter keeping specific frequencies
-                fourier[filter == False] = 0
+                fourier[self.filter == False] = 0
 
-                # Grab heart and respiration rates
-                if index % framerate//2 == 0: # Sampling rate
+                # Grab physiological features
+                if self.index % self.framerate//2 == 0: # Sampling rate
                     # Compute & store signal averages from top-down
                     fourier_average = np.real(fourier).mean(axis=(1, 2, 3))
                     # Multiply corresponding frequency (Hertz) by 60 (seconds)
-                    heart_cache[heart_index] = self.calculate_pulse(freqs[np.argmax(fourier_average)])
+                    self.heart_cache[self.heart_index] = self.calculate_pulse(self.freqs[np.argmax(fourier_average)])
                     # Increment circular index
-                    heart_index = (heart_index + 1) % heart_cache_size
+                    self.heart_index = (self.heart_index + 1) % self.heart_cache_size
                 # Increment circular index
-                index = (index + 1) % cache_size
+                self.index = (self.index + 1) % self.cache_size
 
                 # Calculate & store emotions, heart rate, and breathing every second
                 if elapsed_time >= 1.0:
-                    timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-                    bpm = self.calculate_bpm(heart_cache.mean()) # Heart rate
-                    brpm = self.calculate_brpm(bpm) # Respiration rate
-                    dominant_emotion = self.get_dominant_emotion(alpha_frame) # Emotion
+                    self.timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+                    self.bpm = self.calculate_bpm(self.heart_cache.mean()) # Heart rate
+                    self.brpm = self.calculate_brpm(self.bpm) # Respiration rate
+                    self.dominant_emotion = self.get_dominant_emotion(alpha_frame) # Emotion
 
                     # Add data to lists
-                    timestamp_list.append(timestamp)
-                    heart_rate.append(bpm)
-                    respiration_rate.append(brpm) 
-                    emotions.append(dominant_emotion)
-                    session_active.append(self.session) # Session state
+                    self.timestamp_list.append(self.timestamp)
+                    self.heart_rate.append(self.bpm)
+                    self.respiration_rate.append(self.brpm) 
+                    self.emotions.append(self.dominant_emotion)
+                    self.session_active.append(self.session) # Session state
 
                     # Reset time
-                    last_time = current_time
+                    self.last_time = current_time
 
                 # Show ROI in window; demo
                 try:
                     frame[120:120+25, 10:10+25] = ROI_pyramid
-                    frame[150:150+face_box, 10:10+face_box] = face_ROI * 170
+                    frame[150:150+self.face_box, 10:10+self.face_box] = face_ROI * 170
                     frame[y1:y2, x1:x2] = cv.pyrUp(cv.pyrUp(cv.pyrUp(ROI_pyramid))) * 170 + frame[y1:y2, x1:x2]
                 except Exception as e:
                     print(e)
 
             # Display text with data in frame
-            cv.putText(frame, f'Elapsed time: {int(time.time() - start_time)}', (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
-            cv.putText(frame, f'BPM: {bpm} | BRPM: {brpm} | Emotion: {dominant_emotion}', (10, 60), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
+            cv.putText(frame, f'Elapsed time: {int(time.time() - self.start_time)}', (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
+            cv.putText(frame, f'BPM: {self.bpm} | BRPM: {self.brpm} | Emotion: {self.dominant_emotion}', (10, 60), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
             cv.putText(frame, f'Session: {self.session}', (10, 90), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
 
             # Show frames in a window
             if frame is not None:
                 cv.imshow('Janus', frame)
                 cv.waitKey(1)
-
+    
+        print(f'List lengths: 42, 42, 42, 10, 42')
         # Zip & save iterable data
-        data = list(zip(timestamp_list, heart_rate, respiration_rate, emotions, session_active))
+        data = list(zip(self.timestamp_list, self.heart_rate, self.respiration_rate, self.emotions, self.session_active))
         self.db.add_data(data)
         self.csv_handler.save_data(data)
 
         # Clean up
         cv.destroyAllWindows()
-        cap.release()
+        self.cap.release()
         print("Terminating...")

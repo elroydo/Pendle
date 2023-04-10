@@ -5,7 +5,7 @@ from packages.csv_handler import CSVHandler
 # Define the TestCSVHandler class
 class TestCSVHandler(TestCase):
     def setUp(self):
-        self.csv_handler = CSVHandler(folder='./tests/test_data')
+        self.csv_handler = CSVHandler(folder='./test_data')
 
     def test_save_data(self):
         # Test saving data to CSV file

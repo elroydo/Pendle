@@ -21,7 +21,6 @@ class TestPreprocessing(TestCase):
             gray, alpha = self.monitor.preprocessing(frame)
 
         mock_cvtColor.assert_called_once_with(frame, cv.COLOR_BGR2GRAY)
-
         mock_convertScaleAbs.assert_called_once_with(frame, alpha=1.7, beta=0)
 
         self.assertIsNotNone(gray)
